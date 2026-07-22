@@ -1,0 +1,139 @@
+/* ----------------- Live Wallpaper: Shortstory + Fullstory ----------------- */
+
+(function () {
+
+    // prevenim inițializări multiple
+    if (window.__liveWallpaperInit) return;
+    window.__liveWallpaperInit = true;
+
+    function initVideoContainer(container) {
+
+        // dacă a mai fost inițializat, ieșim
+        if (container.dataset.videoInitialized) return;
+        container.dataset.videoInitialized = "true";
+
+        const video  = container.querySelector(".video-lazy");
+        const loader = container.querySelector(".video-loader");
+
+        if (!video) return;
+
+        const autoPlay = container.dataset.videoAuto === "true";
+
+        let isLoaded     = false;
+        let isLoading    = false;
+        let hoverTimeout = null;
+
+        function loadAndPlay() {
+            if (isLoaded || isLoading) return;
+
+            isLoading = true;
+
+            const source = video.querySelector("source");
+            const src    = source ? source.getAttribute("data-src") : null;
+
+            if (!src) {
+                isLoading = false;
+                if (loader) loader.style.opacity = "0";
+                return;
+            }
+
+            if (loader) loader.style.opacity = "1";
+
+            source.src = src;
+            video.load();
+
+            video.addEventListener("loadeddata", () => {
+                isLoaded  = true;
+                isLoading = false;
+
+                if (loader) loader.style.opacity = "0";
+
+                // fade-in controlat de CSS (transition-opacity)
+                video.style.opacity = "1";
+
+                video.play().catch(() => {});
+            }, { once: true });
+
+            // timeout de siguranță
+            setTimeout(() => {
+                if (isLoading) {
+                    isLoading = false;
+                    if (loader) loader.style.opacity = "0";
+                }
+            }, 8000);
+        }
+
+        // SHORTSTORY – hover
+        if (!autoPlay) {
+
+            container.addEventListener("mouseenter", () => {
+
+                hoverTimeout = setTimeout(() => {
+
+                    if (isLoaded) {
+                        try {
+                            video.currentTime = 0;
+                            video.style.opacity = "1";
+                            video.play();
+                        } catch (e) {}
+                    } else {
+                        loadAndPlay();
+                    }
+
+                }, 250);
+            });
+
+            container.addEventListener("mouseleave", () => {
+
+                if (hoverTimeout) {
+                    clearTimeout(hoverTimeout);
+                    hoverTimeout = null;
+                }
+
+                requestAnimationFrame(() => {
+                    try {
+                        video.pause();
+                    } catch (e) {}
+                    video.currentTime = 0;
+                    video.style.opacity = "0";
+                });
+
+                if (loader) loader.style.opacity = "0";
+            });
+
+        // FULLSTORY – autoplay
+        } else {
+            loadAndPlay();
+        }
+    }
+
+    // inițializează tot ce există în pagină
+    function initAllVideos() {
+        document
+            .querySelectorAll("[data-video-src]:not([data-video-initialized])")
+            .forEach(el => initVideoContainer(el));
+    }
+
+    // DOM ready
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initAllVideos);
+    } else {
+        initAllVideos();
+    }
+
+    // suport pentru paginare AJAX (DLE)
+    let throttle = null;
+    const observer = new MutationObserver(() => {
+        if (throttle) return;
+        throttle = setTimeout(() => {
+            initAllVideos();
+            throttle = null;
+        }, 120);
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+})();
