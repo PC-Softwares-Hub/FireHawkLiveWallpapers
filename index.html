@@ -390,23 +390,58 @@
             btn.disabled = true;
 
             // --- PROXY CONFIGURATION ---
-            // Replace the URL below with your Cloudflare Worker URL later
+            // For best performance, deploy worker.js to Cloudflare Workers (free tier)
+            // and paste your worker URL below:
             const CLOUDFLARE_WORKER_URL = "";
+            // Free CORS proxy fallback (used only if no Cloudflare Worker is set)
+            const CORS_PROXY = "https://api.allorigins.win/raw?url=";
             // ---------------------------
 
-            let downloadUrl = url;
+            const isLocalFile = window.location.protocol === 'file:';
 
-            if (window.location.protocol === 'file:') {
+            if (isLocalFile) {
                 // LOCAL: Use the Node.js server if running
-                downloadUrl = 'http://localhost:3000/.netlify/functions/download?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename);
-            } else if (CLOUDFLARE_WORKER_URL) {
-                // GITHUB PAGES: Use your free Cloudflare Worker
-                downloadUrl = CLOUDFLARE_WORKER_URL + '?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename);
-            } else {
-                // FALLBACK: Try local PHP proxy (for InfinityFree/000webhost)
-                downloadUrl = 'download.php?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename);
+                const downloadUrl = 'http://localhost:3000/.netlify/functions/download?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename);
+                triggerDownload(downloadUrl, filename, btn, originalText);
+                return;
             }
 
+            if (CLOUDFLARE_WORKER_URL) {
+                // GITHUB PAGES: Use your Cloudflare Worker
+                const downloadUrl = CLOUDFLARE_WORKER_URL + '?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent(filename);
+                triggerDownload(downloadUrl, filename, btn, originalText);
+                return;
+            }
+
+            // GITHUB PAGES FIX: Fetch the video with proper Referer header to bypass hotlink protection
+            btn.innerText = "Connecting...";
+
+            fetch(url, {
+                headers: {
+                    'Referer': 'https://wallsflow.com/',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                btn.innerText = "Downloading...";
+                return response.blob();
+            })
+            .then(blob => {
+                const blobUrl = URL.createObjectURL(blob);
+                triggerDownload(blobUrl, filename, btn, originalText);
+                // Clean up the blob URL after a delay
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+            })
+            .catch(() => {
+                // If direct fetch fails (CORS), try the free CORS proxy
+                btn.innerText = "Trying proxy...";
+                const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+                triggerDownload(proxyUrl, filename, btn, originalText);
+            });
+        }
+
+        function triggerDownload(downloadUrl, filename, btn, originalText) {
             const a = document.createElement('a');
             a.href = downloadUrl;
             a.download = filename;
@@ -417,7 +452,7 @@
             setTimeout(() => {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-            }, 3000);
+            }, 4000);
         }
 
         function renderLibrary() {
