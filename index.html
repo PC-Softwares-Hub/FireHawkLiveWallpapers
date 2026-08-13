@@ -323,6 +323,14 @@
         let currentPage = 1;
         const itemsPerPage = 20;
 
+        // --- PROXY CONFIGURATION ---
+        // For best performance, deploy worker.js to Cloudflare Workers (free tier)
+        // and paste your worker URL below:
+        const CLOUDFLARE_WORKER_URL = "https://winter-heart-2d9f.thunderingsky321.workers.dev";
+        // Free CORS proxy fallback (used only if no Cloudflare Worker is set)
+        const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+        // ---------------------------
+
         window.onload = async function() {
             try {
                 // Try automatic load (Works on Netlify/Servers)
@@ -384,18 +392,20 @@
             }
         }
 
+        function proxiedUrl(url) {
+            if (window.location.protocol === 'file:') {
+                return 'http://localhost:3000/.netlify/functions/download?url=' + encodeURIComponent(url);
+            }
+            if (CLOUDFLARE_WORKER_URL) {
+                return CLOUDFLARE_WORKER_URL + '?url=' + encodeURIComponent(url) + '&filename=' + encodeURIComponent('preview.jpg');
+            }
+            return CORS_PROXY + encodeURIComponent(url);
+        }
+
         function downloadFile(url, filename, btn) {
             const originalText = btn.innerHTML;
             btn.innerText = "Starting...";
             btn.disabled = true;
-
-            // --- PROXY CONFIGURATION ---
-            // For best performance, deploy worker.js to Cloudflare Workers (free tier)
-            // and paste your worker URL below:
-            const CLOUDFLARE_WORKER_URL = "https://winter-heart-2d9f.thunderingsky321.workers.dev";
-            // Free CORS proxy fallback (used only if no Cloudflare Worker is set)
-            const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-            // ---------------------------
 
             const isLocalFile = window.location.protocol === 'file:';
 
@@ -476,7 +486,7 @@
 
                 card.innerHTML = `
                     <div class="media-container">
-                        <img src="${item.img}" onerror="this.style.display='none'">
+                        <img src="${proxiedUrl(item.img)}" loading="lazy" onerror="this.style.display='none'">
                         <video muted loop playsinline src="${item.video}" onmouseover="this.play()" onmouseout="this.pause()"></video>
                     </div>
                     <div class="info">

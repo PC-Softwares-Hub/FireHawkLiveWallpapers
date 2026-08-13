@@ -7,7 +7,7 @@ export default {
     const targetUrl = url.searchParams.get('url');
     const filename = url.searchParams.get('filename') || 'wallpaper.mp4';
 
-    if (!targetUrl || !targetUrl.includes('cloud.wallsflow.com/files/')) {
+    if (!targetUrl || (!targetUrl.includes('cloud.wallsflow.com/files/') && !targetUrl.includes('cloud.wallsflow.com/posts/'))) {
       return new Response('Invalid URL', { status: 400 });
     }
 
@@ -22,10 +22,15 @@ export default {
 
     const response = await fetch(modifiedRequest);
 
-    // Stream the video back to the user with download headers
+    // Stream the response back to the user
     const newHeaders = new Headers(response.headers);
     newHeaders.set('Access-Control-Allow-Origin', '*');
-    newHeaders.set('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Only set download attachment header for video files, not images
+    const isVideo = targetUrl.includes('cloud.wallsflow.com/files/');
+    if (isVideo) {
+      newHeaders.set('Content-Disposition', `attachment; filename="${filename}"`);
+    }
 
     return new Response(response.body, {
       status: response.status,
