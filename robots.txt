@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://firehawk-wallpapers.com/sitemap.xml
+Sitemap: https://pc-softwares-hub.github.io/FireHawkLiveWallpapers/sitemap.xml
